@@ -15,12 +15,24 @@ spec:
         app: blog
     spec:
       containers:
-      # Placeholder until the real blog image exists (stage 7).
-      - image: nginx:1.27-alpine
+      # The tag comes from kustomization.yaml, which the blog repo's deploy workflow updates.
+      - image: ghcr.io/jsundquist/jsundquist.github.io
         name: blog
         ports:
-        - containerPort: 80
+        - containerPort: 8080
           name: http
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 2
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 20
         resources:
           requests:
             cpu: 10m
