@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Secrets and credentials: never commit these
+.env
+.env.*
+*.secret.yaml
+*.pem
+*.key
+kubeconfig
+*.kubeconfig
+
+# Terraform (state can contain sensitive values)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
