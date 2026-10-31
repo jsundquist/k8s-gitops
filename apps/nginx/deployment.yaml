@@ -9,13 +9,20 @@ spec:
   selector:
     matchLabels:
       app: nginx
-  strategy: {}
   template:
     metadata:
       labels:
         app: nginx
     spec:
       containers:
-      - image: nginx
+      - image: nginx:1.27-alpine
         name: nginx
-        resources: {}
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
