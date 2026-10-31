@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- deployment.yaml
+- service.yaml
+- ingress.yaml
+# The blog repo's deploy workflow rewrites images[0].newTag on every build.
+# It has no effect until deployment.yaml references this image name.
+images:
+- name: ghcr.io/jsundquist/jsundquist.github.io
+  newTag: bootstrap
