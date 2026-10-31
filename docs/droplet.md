@@ -77,4 +77,38 @@ ssh -N -L 6443:127.0.0.1:6443 <host alias>
 KUBECONFIG=<that file> kubectl get nodes
 ```
 
-Setting `KUBECONFIG` per command keeps this cluster separate from the local k3d one.
+Setting `KUBECONFIG` per command keeps this cluster separate from the local k3d one. Check `kubectl config current-context` before anything destructive: a plain `kubectl` on the laptop points at the local cluster.
+
+## Argo CD on the droplet
+
+Installed into the `argocd` namespace from the upstream install manifest with `kubectl apply --server-side` (the CRDs are too large for client-side apply). The UI is not exposed; reach it with `kubectl port-forward svc/argocd-server -n argocd 8081:443` through the tunnel. The admin password was changed after first login and `argocd-initial-admin-secret` deleted.
+
+The droplet has its own app-of-apps root, separate from the local one:
+
+```
+argocd/droplet/root.yaml        # applied by hand once
+argocd/droplet/apps/            # cert-manager, cluster-issuers, blog
+```
+
+Sync waves order the Applications: cert-manager (0), then cluster-issuers (1), then workloads (2). The issuers Application uses `SkipDryRunOnMissingResource` because the `ClusterIssuer` CRD does not exist until cert-manager has synced.
+
+## DNS and TLS
+
+DNS is hosted at DigitalOcean. Each public hostname has an `A` record pointing at the droplet; no `AAAA` record, since IPv6 is not enabled.
+
+cert-manager is installed as a Helm chart through an Argo CD Application, with the version pinned in `argocd/droplet/apps/cert-manager.yaml`. Two `ClusterIssuer` resources live in `apps/cluster-issuers/`, both using the HTTP-01 solver through Traefik (port 80 must stay open):
+
+- `letsencrypt-staging`: use for any new hostname or change. Browsers do not trust it, but it has generous rate limits.
+- `letsencrypt-prod`: switch to it once staging has issued a certificate.
+
+An Ingress opts in with the `cert-manager.io/cluster-issuer` annotation and a `tls` block. To change issuer on an existing hostname, delete the Certificate and its Secret after the annotation change has synced, so a new one is requested.
+
+If a certificate stalls, walk down the chain with `-n <namespace>`: `describe certificate`, then `certificaterequest`, `order`, `challenge`.
+
+## Apps
+
+| Host | Source | Status |
+|---|---|---|
+| blog.digital-portfolio.net | `apps/blog/` | placeholder nginx until the real image exists |
+
+The apex and `www` hostnames are served by GitHub Pages and are not touched by this cluster.

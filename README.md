@@ -15,6 +15,8 @@ argocd/
 apps/
   nginx/        # plain manifests: Deployment, Service, Ingress
   whoami/       # throwaway second app used to test multi-app structure
+argocd/droplet/ # same pattern for the DigitalOcean cluster: root, cert-manager, issuers, blog
+docs/           # droplet setup notes (firewall, SSH hardening, k3s, TLS)
 lefthook.yml    # pre-commit hook: gitleaks scans staged changes
 ```
 
@@ -27,7 +29,7 @@ Bootstrap on a cluster that already has Argo CD: `kubectl apply -f argocd/root.y
 - [x] 3. Install Argo CD locally and sync the nginx app from this repo
 - [x] 4. Structure the repo for multiple apps (app-of-apps or ApplicationSet)
 - [x] 5. Create the droplet, install k3s, lock it down (firewall, SSH keys) ([notes](docs/droplet.md))
-- [ ] 6. Argo CD on the droplet, then ingress and TLS (Traefik + cert-manager)
+- [x] 6. Argo CD on the droplet, then ingress and TLS (Traefik + cert-manager)
 - [ ] 7. Ship the blog: Dockerfile, GitHub Actions to GHCR, manifests or Helm chart
 - [ ] 8. Ship the SBOM dashboard the same way
 - [ ] 9. Hardening and observability

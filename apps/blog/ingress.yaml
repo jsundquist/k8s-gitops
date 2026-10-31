@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: blog
   annotations:
-    # Staging first; switch to letsencrypt-prod once a staging cert issues.
+    # Production issuer. Use letsencrypt-staging when testing changes to avoid rate limits.
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
