@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: blog
+  annotations:
+    # Staging first; switch to letsencrypt-prod once a staging cert issues.
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - blog.digital-portfolio.net
+    secretName: blog-tls
+  rules:
+  - host: blog.digital-portfolio.net
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: blog
+            port:
+              name: http
