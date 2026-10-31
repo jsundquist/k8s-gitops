@@ -4,7 +4,7 @@ metadata:
   name: blog
   annotations:
     # Staging first; switch to letsencrypt-prod once a staging cert issues.
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
   tls:
