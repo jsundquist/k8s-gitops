@@ -30,9 +30,10 @@ The `bump` job pushes to this repository with a fine-grained personal access tok
 
 - Scope: this repository only, `Contents: Read and write`, nothing else.
 - This token can change what runs on the cluster, because Argo CD deploys whatever lands on `main`. Keep the scope narrow.
-- It expires. When it does, the daily `bump` job fails and the site stops updating (it keeps serving the last version). Set a calendar reminder before the expiry date.
+- It expires. When it does, the daily `bump` job fails and the site stops updating (it keeps serving the last version). A separate `token-expiry` job in the workflow reads the token's expiry from the API on every run and fails (so GitHub emails a failed-workflow notice) when fewer than 14 days remain, or when the token is rejected. Keep a calendar reminder anyway.
 
-## Follow-ups
+## Resilience and cleanup
 
-- `git pull --rebase` before the push in the `bump` job, in case two runs overlap.
-- Retention for old GHCR images. One is added every day and only the latest is used.
+- **Bump races.** The `bump` job runs `git pull --rebase` before pushing and retries up to 3 times with a backoff, because this repository also receives human commits. It exits cleanly if the tag is already pinned.
+- **Image retention.** The `prune` job runs after `bump` and keeps the newest 10 tagged versions of the GHCR package. It never deletes the tag it just built or the tag currently pinned in this repository (covers manual rollbacks), and it only deletes untagged manifests that are more than an hour older than the cutoff. It needs the package to grant the blog repository Admin under "Manage Actions access".
+- **Prune is safe by default.** Scheduled and push runs only delete when the repository variable `GHCR_PRUNE_ENABLED` is `true`; otherwise they log what they would delete. To enable it: run the workflow manually (the `dry_run` input defaults to true), read the "to delete" list once there are more than 10 tagged versions, and only then set the variable.
