@@ -43,11 +43,11 @@ jobs:
           set -euo pipefail
           images=$(
             for dir in apps/blog apps/sbom; do
-              kubectl kustomize "$dir" | yq eval-all '.. | select(tag == "!!map" and has("image")) | .image' -
+              kubectl kustomize "$dir" | yq eval-all --no-doc '.. | select(tag == "!!map" and has("image")) | .image' -
             done | sort -u
           )
           echo "$images"
-          echo "images=$(printf '%s\n' "$images" | jq -Rnc '[inputs | select(length > 0)]')" >> "$GITHUB_OUTPUT"
+          echo "images=$(printf '%s\n' "$images" | jq -Rnc '[inputs | select(length > 0 and . != "---")]')" >> "$GITHUB_OUTPUT"
 
   sbom:
     needs: images
