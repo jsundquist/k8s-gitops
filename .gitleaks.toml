@@ -1,0 +1,12 @@
+# Extend the default rules rather than replacing them.
+[extend]
+useDefault = true
+
+# Sealed Secrets ciphertext is meant to be public, but its entropy looks like an API key.
+# Scoped to one rule, sealed-*.yaml files, and the ciphertext's shape (base64, starts with "Ag").
+[[allowlists]]
+description = "Sealed Secrets ciphertext"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)sealed-[^/]+\.yaml$''']
+regexes = ['''Ag[A-Za-z0-9+/=]{300,}''']
