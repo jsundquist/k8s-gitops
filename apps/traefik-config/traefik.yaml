@@ -1,0 +1,14 @@
+# k3s installs Traefik with its own Helm controller. A HelmChartConfig named "traefik" in kube-system
+# overrides that chart's values.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    service:
+      spec:
+        # Preserve the real client address. With the default (Cluster) the load balancer SNATs it to the
+        # node's bridge IP, so every client looks the same to the apps' rate limiters and logs.
+        externalTrafficPolicy: Local
