@@ -76,8 +76,20 @@ kubectl create secret generic sbom-app -n sbom --dry-run=client -o yaml \
 - **To change one sealed key without touching the rest**, use `kubeseal --merge-into apps/sbom/sealed-app.yaml`.
 - **gitleaks flags Sealed Secrets ciphertext** as an API key, so `.gitleaks.toml` allow-lists it narrowly.
 
+## Deploys
+
+The sbom repository's `release.yml` builds, scans (Trivy) and pushes the image on every push to `main`. Its `bump` job then pins the new tag in `apps/sbom/kustomization.yaml` here (commit `chore(sbom): deploy <tag>`), and Argo CD syncs: the migrate Job runs first, then web and worker roll out. A separate `token-expiry` job warns 14 days before the token expires.
+
+- **Token:** a fine-grained PAT, repository `jsundquist/k8s-gitops` only, `Contents: Read and write`, stored as the `GITOPS_TOKEN` secret in the sbom repository. It is separate from the blog's token so either can be revoked on its own.
+- **Poll delay.** Argo CD polls git every few minutes and has no webhook (the API is not exposed), so a deploy can take several minutes to start. Hard-refresh the Application to start it sooner.
+- **Image retention** is not implemented for this repository: it builds only on pushes to `main`, so images accumulate slowly.
+
+## More notes
+
+- Backups: [backups.md](backups.md).
+- Client IPs, network policies and other hardening: [hardening.md](hardening.md).
+
 ## Follow-ups
 
-- Verify the client IP seen by the app, with a forged `X-Forwarded-For`. The rate limiter trusts the leftmost value, so Traefik must overwrite it and k3s ServiceLB must not mask the real address.
-- Tag-bump job in the sbom repo, as the blog has.
-- Postgres backups, NetworkPolicies, and a pinned Postgres digest (stage 9).
+- Pin the Postgres image by digest.
+- Alert on a failed backup Job (with the observability work).
