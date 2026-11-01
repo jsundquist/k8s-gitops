@@ -24,6 +24,17 @@ lefthook.yml    # pre-commit hook: gitleaks scans staged changes
 
 Bootstrap on a cluster that already has Argo CD: `kubectl apply -f argocd/root.yaml`. Argo CD creates everything else from git.
 
+## Tools and CI
+
+Local pre-commit hook (`lefthook.yml`) and CI run the same secret scan, so versions are kept in step:
+
+| Tool | Version | Where |
+|---|---|---|
+| gitleaks | 8.30.1 | `brew install gitleaks`; pinned by version and sha256 in `.github/workflows/ci.yml` |
+| lefthook | 2.2.2 | `brew install lefthook`, then `lefthook install` |
+
+`.github/workflows/ci.yml` runs on every push and pull request: a gitleaks scan of the whole history, a kubeconform validation of every manifest (Kustomize apps are built first), and a check that every Argo CD Application points at a path that exists. Dependabot keeps the pinned GitHub Actions current. The `.gitleaks.toml` allowlist covers only Sealed Secrets ciphertext. GitHub's own secret scanning and push protection are also enabled on the repository.
+
 ## Roadmap
 
 - [x] 1. Reset: README stating the goal
