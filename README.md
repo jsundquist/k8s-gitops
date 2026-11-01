@@ -15,8 +15,10 @@ argocd/
 apps/
   nginx/        # plain manifests: Deployment, Service, Ingress
   whoami/       # throwaway second app used to test multi-app structure
-argocd/droplet/ # same pattern for the DigitalOcean cluster: root, cert-manager, issuers, blog
-docs/           # droplet setup, blog and SBOM dashboard notes
+  blog/, sbom/  # the real apps on the droplet (Deployments, Postgres, network policies, sealed secrets)
+  traefik-config/ # HelmChartConfig that keeps real client IPs
+argocd/droplet/ # same pattern for the DigitalOcean cluster: root, cert-manager, sealed-secrets, issuers, traefik-config, blog, sbom
+docs/           # droplet, blog, SBOM dashboard, backups and hardening notes
 lefthook.yml    # pre-commit hook: gitleaks scans staged changes
 ```
 
@@ -32,4 +34,4 @@ Bootstrap on a cluster that already has Argo CD: `kubectl apply -f argocd/root.y
 - [x] 6. Argo CD on the droplet, then ingress and TLS (Traefik + cert-manager)
 - [x] 7. Ship the blog: Dockerfile, GitHub Actions to GHCR, manifests or Helm chart ([notes](docs/blog.md))
 - [x] 8. Ship the SBOM dashboard the same way ([notes](docs/sbom.md))
-- [ ] 9. Hardening and observability
+- [ ] 9. Hardening and observability ([notes](docs/hardening.md), [backups](docs/backups.md))
