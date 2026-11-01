@@ -1,0 +1,104 @@
+name: Cluster SBOM
+
+# Uploads a software bill of materials for every container image this repo deploys to the SBOM dashboard,
+# so the dashboard's worker can watch them for new vulnerabilities. Project names are k8s-gitops/<image path>,
+# versions are the image tags.
+on:
+  schedule:
+    - cron: "30 6 * * 1" # Mondays, 06:30 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/cluster-sbom.yml
+
+permissions: {}
+
+concurrency:
+  group: cluster-sbom
+  cancel-in-progress: false
+
+env:
+  DASHBOARD_URL: https://sbom.digital-portfolio.net
+
+jobs:
+  images:
+    # Fork pull requests cannot read the upload token
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      images: ${{ steps.list.outputs.images }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Only the apps that run on the droplet. apps/nginx and apps/whoami belong to the local practice cluster.
+      - name: List deployed images
+        id: list
+        run: |
+          set -euo pipefail
+          images=$(
+            for dir in apps/blog apps/sbom; do
+              kubectl kustomize "$dir" | yq eval-all '.. | select(tag == "!!map" and has("image")) | .image' -
+            done | sort -u
+          )
+          echo "$images"
+          echo "images=$(printf '%s\n' "$images" | jq -Rnc '[inputs | select(length > 0)]')" >> "$GITHUB_OUTPUT"
+
+  sbom:
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.images.outputs.images) }}
+    steps:
+      - name: Generate SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ${{ matrix.image }}
+          format: cyclonedx-json
+          output-file: ${{ runner.temp }}/sbom.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Upload to the dashboard
+        env:
+          IMAGE: ${{ matrix.image }}
+          SBOM_FILE: ${{ runner.temp }}/sbom.cdx.json
+          API_TOKEN: ${{ secrets.SBOM_DASHBOARD_TOKEN }}
+        run: |
+          set -euo pipefail
+          # ghcr.io/jsundquist/sbom:abc-1 -> project k8s-gitops/jsundquist/sbom, version abc-1
+          name="${IMAGE%%@*}"
+          last="${name##*/}"
+          if [[ "$last" == *:* ]]; then
+            version="${last##*:}"
+            path="${name%:*}"
+          else
+            version="latest"
+            path="$name"
+          fi
+          first="${path%%/*}"
+          if [[ "$path" == */* && ( "$first" == *.* || "$first" == *:* || "$first" == localhost ) ]]; then
+            path="${path#*/}"
+          fi
+          project="k8s-gitops/${path}"
+          query=$(jq -rn --arg p "$project" --arg v "$version" '"project=\($p | @uri)&version=\($v | @uri)"')
+          echo "Uploading ${project} ${version}"
+          code=$(curl -sS -o response.json -w '%{http_code}' -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${API_TOKEN}" \
+            --data-binary "@${SBOM_FILE}" \
+            "${DASHBOARD_URL}/api/v1/sboms?${query}")
+          cat response.json; echo
+          if [ "$code" -ge 300 ]; then
+            echo "::error::Upload of ${project} failed with HTTP ${code}"
+            exit 1
+          fi
