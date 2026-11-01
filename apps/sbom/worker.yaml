@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    app: sbom-worker
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  # Never run two workers at once, even briefly during a rollout.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: sbom-worker
+  template:
+    metadata:
+      labels:
+        app: sbom-worker
+    spec:
+      enableServiceLinks: false
+      # 25s drain for an in-flight enrichment run, plus margin.
+      terminationGracePeriodSeconds: 40
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: worker
+        image: ghcr.io/jsundquist/sbom
+        # Node directly, not npm: npm's shell swallows SIGTERM and the drain never runs.
+        command: ["node", "--import", "tsx", "src/worker/main.ts"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: sbom-db
+              key: database-url
+        # No probes: it serves no HTTP and exits (and is restarted) on a fatal error.
+        resources:
+          requests:
+            cpu: 25m
+            memory: 192Mi
+          limits:
+            cpu: 500m
+            memory: 384Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}

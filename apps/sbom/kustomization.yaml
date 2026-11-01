@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - configmap.yaml
+  - sealed-db.yaml
+  - sealed-app.yaml
+  - postgres.yaml
+  - migrate.yaml
+  - web.yaml
+  - worker.yaml
+  - ingress.yaml
+# Create the sealed secrets before everything that reads them.
+patches:
+  - target:
+      kind: SealedSecret
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-1"
+# The sbom repo's release workflow publishes the image; the tag is bumped here.
+images:
+  - name: ghcr.io/jsundquist/sbom
+    newTag: b9a9773-1

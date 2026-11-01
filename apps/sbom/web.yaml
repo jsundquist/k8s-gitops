@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app: sbom-web
+spec:
+  selector:
+    app: sbom-web
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: sbom-web
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  # Must stay at 1: the rate limiter lives in each pod's memory.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sbom-web
+  template:
+    metadata:
+      labels:
+        app: sbom-web
+    spec:
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 15
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: web
+        # The tag comes from kustomization.yaml. No command: the image default runs next directly.
+        image: ghcr.io/jsundquist/sbom
+        ports:
+        - containerPort: 3000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: sbom-config
+        - secretRef:
+            name: sbom-app
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: sbom-db
+              key: database-url
+        startupProbe:
+          httpGet:
+            path: /api/livez
+            port: http
+          periodSeconds: 2
+          timeoutSeconds: 2
+          failureThreshold: 15
+        # Liveness skips the database so a Postgres outage never restarts web.
+        livenessProbe:
+          httpGet:
+            path: /api/livez
+            port: http
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/healthz
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 50m
+            memory: 192Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: next-cache
+          mountPath: /app/.next/cache
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: next-cache
+        emptyDir: {}

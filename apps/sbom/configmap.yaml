@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sbom-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  NEXTAUTH_URL: https://sbom.digital-portfolio.net
+  # Behind Traefik, which overwrites any inbound X-Forwarded-For.
+  TRUST_PROXY: "true"
+  ALLOW_OPEN_UPLOADS: "false"
+  ALLOW_OPEN_READS: "false"
+  # Both are public identifiers, not secrets. Fill in before the first sync.
+  OWNER_GITHUB_ID: "536405"
+  GITHUB_CLIENT_ID: Ov23liKuCghzsbwux8oB

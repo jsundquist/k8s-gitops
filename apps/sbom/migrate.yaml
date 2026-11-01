@@ -1,0 +1,57 @@
+# Runs on every sync, after Postgres is ready (wave 0) and before web/worker roll out (wave 2).
+# A Sync-phase hook rather than PreSync, because PreSync would run before Postgres exists on the first sync.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  labels:
+    app: sbom-migrate
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: sbom-migrate
+    spec:
+      restartPolicy: Never
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: migrate
+        image: ghcr.io/jsundquist/sbom
+        command: ["node", "--import", "tsx", "scripts/migrate.ts"]
+        env:
+        # The only variable migrate needs.
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: sbom-db
+              key: database-url
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
