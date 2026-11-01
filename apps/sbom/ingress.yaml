@@ -3,8 +3,8 @@ kind: Ingress
 metadata:
   name: sbom
   annotations:
-    # Staging first, to avoid Let's Encrypt rate limits. Switch to letsencrypt-prod once it issues.
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    # Production issuer. Use letsencrypt-staging when testing changes to avoid rate limits.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
   tls:
