@@ -4,7 +4,6 @@ resources:
   - configmap.yaml
   - sealed-db.yaml
   - sealed-app.yaml
-  # Backups: seal sbom-backup (docs/backups.md), then uncomment both.
   - sealed-backup.yaml
   - backup.yaml
   - postgres.yaml
@@ -12,6 +11,7 @@ resources:
   - web.yaml
   - worker.yaml
   - ingress.yaml
+  - networkpolicies.yaml
 # Create the sealed secrets before everything that reads them.
 patches:
   - target:

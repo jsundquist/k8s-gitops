@@ -1,0 +1,152 @@
+# Default deny in both directions, then allow only what each workload needs.
+# Pod labels: sbom-web, sbom-worker, sbom-migrate, sbom-backup, sbom-postgres.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+# Traefik (the only way in from the internet) may reach the web app.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-traefik-to-web
+spec:
+  podSelector:
+    matchLabels:
+      app: sbom-web
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 3000
+---
+# cert-manager runs a temporary HTTP-01 solver pod here during issuance and renewal.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-traefik-to-acme-solver
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 8089
+---
+# Only the app's own workloads may connect to Postgres.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: sbom-postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchExpressions:
+        - key: app
+          operator: In
+          values: [sbom-web, sbom-worker, sbom-migrate, sbom-backup]
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# The mirror image: those workloads may connect out to Postgres.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-postgres
+spec:
+  podSelector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values: [sbom-web, sbom-worker, sbom-migrate, sbom-backup]
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: sbom-postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# HTTPS to the public internet, and nothing else. web: GitHub sign-in. worker: OSV, deps.dev, CISA, FIRST.
+# backup: DigitalOcean Spaces. NetworkPolicy cannot match hostnames, so this allows any public address on 443
+# and excludes private ranges (cluster, node, other VPC members) and the cloud metadata address.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-https-external
+spec:
+  podSelector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values: [sbom-web, sbom-worker, sbom-backup]
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 169.254.0.0/16
+        - 100.64.0.0/10
+    ports:
+    - protocol: TCP
+      port: 443
