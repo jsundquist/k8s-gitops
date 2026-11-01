@@ -4,6 +4,9 @@ resources:
   - configmap.yaml
   - sealed-db.yaml
   - sealed-app.yaml
+  # Backups: seal sbom-backup (docs/backups.md), then uncomment both.
+  - sealed-backup.yaml
+  - backup.yaml
   - postgres.yaml
   - migrate.yaml
   - web.yaml

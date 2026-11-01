@@ -1,0 +1,133 @@
+# Nightly encrypted pg_dump to a private DigitalOcean Spaces bucket. See docs/backups.md.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  labels:
+    app: sbom-backup
+spec:
+  schedule: "17 3 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app: sbom-backup
+        spec:
+          restartPolicy: Never
+          enableServiceLinks: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+          # Step 1: dump the database into a shared scratch volume.
+          initContainers:
+          - name: dump
+            image: postgres:16
+            command:
+            - sh
+            - -ec
+            - |
+              pg_dump --format=custom --no-owner --dbname="$DATABASE_URL" --file=/work/sbom.dump
+              test -s /work/sbom.dump
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sbom-db
+                  key: database-url
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: ["ALL"]
+            volumeMounts:
+            - name: work
+              mountPath: /work
+            - name: tmp
+              mountPath: /tmp
+          # Step 2: encrypt (rclone crypt) and upload, then delete backups older than 14 days.
+          containers:
+          - name: upload
+            image: rclone/rclone:1.75.2
+            command:
+            - sh
+            - -ec
+            - |
+              rclone copyto /work/sbom.dump "enc:sbom-$(date -u +%Y%m%dT%H%M%SZ).dump"
+              rclone delete --min-age 14d enc:
+              rclone size enc:
+            env:
+            - name: HOME
+              value: /tmp
+            # "bk" is the Spaces bucket, "enc" encrypts file contents and names on top of it.
+            - name: RCLONE_CONFIG_BK_TYPE
+              value: s3
+            - name: RCLONE_CONFIG_BK_PROVIDER
+              value: DigitalOcean
+            - name: RCLONE_CONFIG_BK_ENDPOINT
+              value: sfo3.digitaloceanspaces.com
+            - name: RCLONE_CONFIG_BK_NO_CHECK_BUCKET
+              value: "true"
+            - name: RCLONE_CONFIG_BK_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: sbom-backup
+                  key: access-key-id
+            - name: RCLONE_CONFIG_BK_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sbom-backup
+                  key: secret-access-key
+            - name: RCLONE_CONFIG_ENC_TYPE
+              value: crypt
+            - name: RCLONE_CONFIG_ENC_REMOTE
+              value: bk:jsundquist-k8s-backups/postgres
+            - name: RCLONE_CONFIG_ENC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sbom-backup
+                  key: crypt-password
+            - name: RCLONE_CONFIG_ENC_PASSWORD2
+              valueFrom:
+                secretKeyRef:
+                  name: sbom-backup
+                  key: crypt-password2
+            resources:
+              requests:
+                cpu: 25m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: ["ALL"]
+            volumeMounts:
+            - name: work
+              mountPath: /work
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          volumes:
+          - name: work
+            emptyDir: {}
+          - name: tmp
+            emptyDir: {}
