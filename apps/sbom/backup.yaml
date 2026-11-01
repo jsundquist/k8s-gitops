@@ -38,6 +38,11 @@ spec:
             - sh
             - -ec
             - |
+              # A new pod's network policy rules take about a second to apply, so wait for Postgres first.
+              for _ in $(seq 1 30); do
+                pg_isready -q -d "$DATABASE_URL" && break
+                sleep 2
+              done
               pg_dump --format=custom --no-owner --dbname="$DATABASE_URL" --file=/work/sbom.dump
               test -s /work/sbom.dump
             env:
