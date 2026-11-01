@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history, so every commit is scanned and not just the tip
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Keep this version in step with the local hook (see README "Tools")
+      - name: Install gitleaks
+        env:
+          VERSION: 8.30.1
+          SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tgz" "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          echo "${SHA256}  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+
+      # Picks up .gitleaks.toml from the repo root
+      - name: Scan history
+        run: '"$RUNNER_TEMP/gitleaks" git --redact --no-banner --verbose .'
+
+  manifests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install kubeconform
+        env:
+          VERSION: 0.8.0
+          SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/kubeconform.tgz" "https://github.com/yannh/kubeconform/releases/download/v${VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${SHA256}  $RUNNER_TEMP/kubeconform.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/kubeconform.tgz" -C "$RUNNER_TEMP" kubeconform
+
+      # Kustomize apps are built first, so what Argo CD would apply is what gets validated.
+      # CRD schemas (Argo CD, cert-manager, Sealed Secrets) come from the community catalog;
+      # kinds without a schema (such as k3s's HelmChartConfig) are skipped.
+      - name: Validate manifests
+        run: |
+          set -euo pipefail
+          kc() {
+            "$RUNNER_TEMP/kubeconform" -strict -summary -kubernetes-version 1.37.0 -ignore-missing-schemas \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              "$@"
+          }
+          for dir in apps/*/; do
+            echo "::group::${dir}"
+            if [ -f "${dir}kustomization.yaml" ]; then
+              kubectl kustomize "$dir" | kc -
+            else
+              kc "$dir"
+            fi
+            echo "::endgroup::"
+          done
+          echo "::group::argocd"
+          kc argocd
+          echo "::endgroup::"
+
+      - name: Check that every Application path exists
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r file; do
+            path=$(yq '.spec.source.path // ""' "$file")
+            if [ -n "$path" ] && [ ! -d "$path" ]; then
+              echo "::error file=${file}::source path '${path}' does not exist"
+              fail=1
+            fi
+          done < <(find argocd -name '*.yaml')
+          exit "$fail"
