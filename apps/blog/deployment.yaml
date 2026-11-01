@@ -5,7 +5,7 @@ metadata:
     app: blog
   name: blog
 spec:
-  replicas: 1
+  replicas: "one"
   selector:
     matchLabels:
       app: blog
