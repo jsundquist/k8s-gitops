@@ -69,9 +69,15 @@ kubectl create secret generic sbom-app -n sbom --dry-run=client -o yaml \
 5. Secrets sealed and uncommented as above.
 6. Commit and push. The `sbom` Application is picked up by the root and syncs by wave.
 
+## Gotchas hit during the first deploy
+
+- **A wrong OAuth client secret gives `OAuthCallback` at sign-in.** The pod log said `incorrect_client_credentials`. The sealed value was 18 characters instead of GitHub's 40, from a bad terminal paste (bracketed paste leaking into `read -rs`). Check the length (`echo ${#VAR}`) before sealing, and verify in the pod with `kubectl exec deploy/web -n sbom -- sh -c 'echo ${#GITHUB_CLIENT_SECRET}'`.
+- **A changed Secret does not restart pods.** Environment variables are read at startup, so run `kubectl rollout restart deploy/web -n sbom` after resealing.
+- **To change one sealed key without touching the rest**, use `kubeseal --merge-into apps/sbom/sealed-app.yaml`.
+- **gitleaks flags Sealed Secrets ciphertext** as an API key, so `.gitleaks.toml` allow-lists it narrowly.
+
 ## Follow-ups
 
 - Verify the client IP seen by the app, with a forged `X-Forwarded-For`. The rate limiter trusts the leftmost value, so Traefik must overwrite it and k3s ServiceLB must not mask the real address.
-- Switch the Ingress to `letsencrypt-prod` once the staging certificate issues.
 - Tag-bump job in the sbom repo, as the blog has.
 - Postgres backups, NetworkPolicies, and a pinned Postgres digest (stage 9).
