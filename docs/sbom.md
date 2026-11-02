@@ -19,7 +19,7 @@ Two images built from the same commit and tagged identically run in the `sbom` n
 - **Node directly, not npm.** `npm` runs a shell that swallows SIGTERM, so graceful shutdown never ran. Web uses the image default (`node server.js`); the worker sets `command` explicitly and migrate runs `scripts/migrate.ts`.
 - **Single replica for web.** The rate limiter is in memory per pod. Web is cut off on rollout because Next.js does not drain; accepted.
 - **Worker uses `Recreate`.** Two workers must not enrich at once, even briefly.
-- **Postgres in-cluster, no backups yet.** The data is rebuildable from re-uploads, but a backup job is a stage 9 item.
+- **Postgres in-cluster, backed up nightly.** The data is rebuildable from re-uploads, but a CronJob still dumps it every night to an encrypted Spaces bucket; see [backups.md](backups.md).
 - **Public images.** Same reasoning as the blog: no pull secret. Make both GHCR packages (`sbom` and `sbom-worker`) public by hand after the first push.
 - **Two images, one tag.** Web needs no `tsx` or sources, so it ships separately. Migrate and worker must run from the `sbom-worker` image, which is why `kustomization.yaml` lists both. The release `bump` job sets both tags with `yq` (`images[0]` is web, the other is matched by name), so keep that order and never pin them by hand.
 - **Hardening.** Non-root, read-only root filesystem, no capabilities, `RuntimeDefault` seccomp, and `emptyDir`s for the few writable paths. This mirrors the compose file.
