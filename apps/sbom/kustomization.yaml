@@ -26,6 +26,6 @@ patches:
 # Keep the web entry first and do not hand-edit the tags: the bump job addresses them by position and name.
 images:
   - name: ghcr.io/jsundquist/sbom
-    newTag: fe901d6-11
+    newTag: ab01c17-12
   - name: ghcr.io/jsundquist/sbom-worker
-    newTag: fe901d6-11
+    newTag: ab01c17-12
