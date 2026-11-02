@@ -11,6 +11,9 @@ Stage 9 notes: what has been done, why, and what is left.
 | Default-deny network policies for the `blog` and `sbom` namespaces | below |
 | Non-root pods, read-only root filesystems, dropped capabilities, `RuntimeDefault` seccomp | `apps/blog`, `apps/sbom` |
 | Pre-commit gitleaks, with a narrow allowlist for Sealed Secrets ciphertext | `lefthook.yml`, `.gitleaks.toml` |
+| CI: gitleaks history scan, manifest validation, actionlint, zizmor; Dependabot with a 7-day cooldown | `.github/workflows/ci.yml`, `.github/dependabot.yml` |
+| Weekly SBOM upload for every deployed image, watched by the SBOM dashboard | `.github/workflows/cluster-sbom.yml` |
+| Postgres pinned by digest | `apps/sbom/postgres.yaml`, `apps/sbom/backup.yaml` |
 
 ## Client IPs
 
@@ -49,5 +52,3 @@ Not covered yet: `argocd` (the upstream install ships its own ingress policies),
 
 - Swap file and resource headroom (4 GB, no swap).
 - Observability: metrics, logs and alerting (including failed backups).
-- CI gitleaks and pinned tool versions.
-- Pin the Postgres image by digest.

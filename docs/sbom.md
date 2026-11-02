@@ -89,7 +89,15 @@ The sbom repository's `release.yml` builds, scans (Trivy) and pushes the image o
 - Backups: [backups.md](backups.md).
 - Client IPs, network policies and other hardening: [hardening.md](hardening.md).
 
+## Updating Postgres
+
+The database and backup images are pinned by digest (`postgres:16@sha256:...`), so nothing changes underneath you, and they always match each other. A digest freezes OS packages too, so bump it deliberately, for example monthly or when the dashboard's `k8s-gitops/postgres` entry shows new fixable vulnerabilities:
+
+1. Find the new digest of the multi-arch index: `docker buildx imagetools inspect postgres:16` (the top-level `Digest`), or the Docker Hub tags API.
+2. Replace it in both `postgres.yaml` and `backup.yaml`. Stay on major version 16 here: a major upgrade needs a dump and restore.
+3. Run a manual backup first: `kubectl create job --from=cronjob/postgres-backup pre-upgrade-backup -n sbom`.
+4. Push. Argo CD restarts the pod (a few seconds without the database), and the app reconnects by itself.
+
 ## Follow-ups
 
-- Pin the Postgres image by digest.
 - Alert on a failed backup Job (with the observability work).
