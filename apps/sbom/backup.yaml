@@ -33,7 +33,8 @@ spec:
           # Step 1: dump the database into a shared scratch volume.
           initContainers:
           - name: dump
-            image: postgres:16
+            # Same digest as the database, so the dump client always matches the server.
+            image: postgres:16@sha256:5db6dac2ef5dcff512f4f00a009c3c332b9f2f28f24277175bf3e4a3d02ef83a
             command:
             - sh
             - -ec
