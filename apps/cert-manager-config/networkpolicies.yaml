@@ -1,0 +1,126 @@
+# Default deny in both directions, then allow only what cert-manager needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+# All three components watch and write through the Kubernetes API. k3s's API server listens on the node's
+# address, which is where the kubernetes Service resolves to after NAT. Change this if the droplet's IP changes.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-apiserver
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 143.198.110.41/32
+    ports:
+    - protocol: TCP
+      port: 6443
+---
+# The API server calls the webhook to validate and mutate cert-manager resources. The call arrives from the node,
+# either as its own address or as the pod network's gateway (10.42.0.1).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-apiserver-to-webhook
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: webhook
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 143.198.110.41/32
+    - ipBlock:
+        cidr: 10.42.0.1/32
+    ports:
+    - protocol: TCP
+      port: 10250
+---
+# The controller talks to Let's Encrypt (443) and checks the HTTP-01 challenge URL from outside (80) before it
+# asks the CA to validate. Private ranges and the metadata address stay blocked.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-controller-egress-acme
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: controller
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 169.254.0.0/16
+        - 100.64.0.0/10
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+# The HTTP-01 self-check requests the challenge URL through the droplet's public address. The load balancer
+# rewrites that to Traefik's pod before policies are evaluated, so the public-internet rule above does not cover it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-controller-egress-traefik
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: controller
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8443
