@@ -10,5 +10,5 @@ resources:
 # It has no effect until deployment.yaml references this image name.
 images:
   - name: ghcr.io/jsundquist/jsundquist.github.io
-    newTag: 97ffa9c-59
-    digest: sha256:7da46fd69926ae4e7d9ad935926a13570d5beca8d8f8c89f8f8097390844accd
+    newTag: c0442ab-60
+    digest: sha256:b212ecddd6a3bdecca09e6884d628b27d8a6c31d487f4bbc9b9578ad29eba8c3
