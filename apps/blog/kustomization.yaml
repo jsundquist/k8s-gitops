@@ -9,4 +9,4 @@ resources:
 # It has no effect until deployment.yaml references this image name.
 images:
   - name: ghcr.io/jsundquist/jsundquist.github.io
-    newTag: c8047d9-48
+    newTag: 2a34fae-49
