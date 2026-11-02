@@ -8,7 +8,7 @@ Stage 9 notes: what has been done, why, and what is left.
 |---|---|
 | Nightly encrypted Postgres backups to DigitalOcean Spaces | [backups.md](backups.md) |
 | Real client IPs reach the apps | below |
-| Default-deny network policies for the `blog` and `sbom` namespaces | below |
+| Default-deny network policies for the `blog`, `sbom` and `cert-manager` namespaces | below |
 | Non-root pods, read-only root filesystems, dropped capabilities, `RuntimeDefault` seccomp | `apps/blog`, `apps/sbom` (the blog gained these on 2026-11-02; before that only `apps/sbom` had them) |
 | Resource requests and memory limits on every container, plus a `LimitRange` backstop per namespace | `apps/*/limitrange.yaml` |
 | Pod Security Admission `restricted` enforced on the `blog` and `sbom` namespaces | `argocd/droplet/apps/blog.yaml`, `sbom.yaml` |
@@ -50,7 +50,12 @@ Lessons:
 - **A new pod's rules take about a second to apply.** Connections made in the first moments of a pod's life are refused. Anything that connects immediately (the backup's dump step) must retry. Web and worker retry on their own, and Jobs have `backoffLimit`.
 - **`ECONNREFUSED`, not a timeout.** k3s's policy engine rejects instead of dropping, so blocked connections fail fast.
 
-Not covered yet: `argocd` (the upstream install ships its own ingress policies), `cert-manager`, and `kube-system`. A default-deny there needs careful allows for the API server, webhooks and ACME self-checks, so it is deferred.
+`cert-manager` has the same default-deny plus explicit allows (`apps/cert-manager-config/`): DNS, the API server (the droplet's address on 6443), the API server calling the webhook (10250, arriving from the node's address or the pod gateway `10.42.0.1`), the controller to Let's Encrypt on 443, and the controller's HTTP-01 self-check. Verified from a pod carrying the controller's labels: Let's Encrypt and the API server are reachable; the metadata address and private ranges are not; a server-side dry-run of a Certificate passes the webhook; a staging certificate issued with the policies in place.
+
+- **The self-check needs its own rule.** It requests the challenge URL through the droplet's public address, but the load balancer rewrites that to Traefik's pod IP before policies are evaluated, so the "public internet minus private ranges" rule blocks it. It needs an explicit allow to Traefik's container ports (8000/8443).
+- **The API server address is hard-coded.** If the droplet's IP changes, update `allow-egress-to-apiserver` and `allow-apiserver-to-webhook` or cert-manager loses the API.
+
+`argocd` keeps the upstream install's ingress policies and has no egress restriction. `kube-system` (CoreDNS, Traefik, metrics-server, Sealed Secrets, the k3s controllers) has no policies: a default-deny there risks cluster DNS and ingress for little gain on a single-node cluster with no untrusted workloads, so both are an accepted gap.
 
 ## Pod Security Admission
 
