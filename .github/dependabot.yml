@@ -5,5 +5,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # A freshly published (possibly malicious) release is not proposed until it has had a week to be caught
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
