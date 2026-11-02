@@ -42,7 +42,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: web
-        # The tag comes from kustomization.yaml. No command: the image default runs next directly.
+        # The tag comes from kustomization.yaml. No command: the image default is "node server.js" (Next.js standalone).
         image: ghcr.io/jsundquist/sbom
         ports:
         - containerPort: 3000

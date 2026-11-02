@@ -21,7 +21,10 @@ patches:
         path: /metadata/annotations
         value:
           argocd.argoproj.io/sync-wave: "-1"
-# The sbom repo's release workflow publishes the image; the tag is bumped here.
+# The sbom repo's release workflow publishes both images with the same tag and bumps both here.
+# Keep the web entry first and do not hand-edit the tags: the bump job addresses them by position and name.
 images:
   - name: ghcr.io/jsundquist/sbom
+    newTag: c79019e-4
+  - name: ghcr.io/jsundquist/sbom-worker
     newTag: c79019e-4

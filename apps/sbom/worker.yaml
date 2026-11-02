@@ -31,7 +31,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: worker
-        image: ghcr.io/jsundquist/sbom
+        image: ghcr.io/jsundquist/sbom-worker
         # Node directly, not npm: npm's shell swallows SIGTERM and the drain never runs.
         command: ["node", "--import", "tsx", "src/worker/main.ts"]
         env:
