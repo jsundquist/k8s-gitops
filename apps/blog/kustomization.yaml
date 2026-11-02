@@ -5,6 +5,7 @@ resources:
   - service.yaml
   - ingress.yaml
   - networkpolicies.yaml
+  - limitrange.yaml
 # The blog repo's deploy workflow rewrites images[0].newTag on every build.
 # It has no effect until deployment.yaml references this image name.
 images:
