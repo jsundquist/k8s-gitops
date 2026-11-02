@@ -11,12 +11,12 @@ Stage 9 notes: what has been done, why, and what is left.
 | Default-deny network policies for the `blog` and `sbom` namespaces | below |
 | Non-root pods, read-only root filesystems, dropped capabilities, `RuntimeDefault` seccomp | `apps/blog`, `apps/sbom` (the blog gained these on 2026-11-02; before that only `apps/sbom` had them) |
 | Resource requests and memory limits on every container, plus a `LimitRange` backstop per namespace | `apps/*/limitrange.yaml` |
-| Pod Security Admission `restricted` in warn and audit mode on the `blog` and `sbom` namespaces | `argocd/droplet/apps/blog.yaml`, `sbom.yaml` |
+| Pod Security Admission `restricted` enforced on the `blog` and `sbom` namespaces | `argocd/droplet/apps/blog.yaml`, `sbom.yaml` |
 | Ruleset on `main` that blocks force-pushes and deletion (no PR requirement, so the release bots can still push) | repository settings |
 | Pre-commit gitleaks, with a narrow allowlist for Sealed Secrets ciphertext | `lefthook.yml`, `.gitleaks.toml` |
 | CI: gitleaks history scan, manifest validation, actionlint, zizmor; Dependabot with a 7-day cooldown | `.github/workflows/ci.yml`, `.github/dependabot.yml` |
 | Weekly SBOM upload for every deployed image, watched by the SBOM dashboard | `.github/workflows/cluster-sbom.yml` |
-| Postgres and rclone pinned by digest; CI fails any other unpinned image except the three the release workflows re-pin | `apps/sbom/postgres.yaml`, `apps/sbom/backup.yaml`, `.github/workflows/ci.yml` |
+| Every image pinned by digest: Postgres and rclone by hand, the blog and sbom images by their release workflows (tag and digest together); CI fails any unpinned image | `apps/sbom/postgres.yaml`, `apps/sbom/backup.yaml`, `.github/workflows/ci.yml` |
 | `SECURITY.md`, private vulnerability reporting, actions required to be SHA-pinned | `SECURITY.md`, repository settings |
 
 ## Client IPs
@@ -54,7 +54,7 @@ Not covered yet: `argocd` (the upstream install ships its own ingress policies),
 
 ## Pod Security Admission
 
-The `blog` and `sbom` namespaces carry `pod-security.kubernetes.io/warn` and `audit` labels set to `restricted`, applied by Argo CD through `managedNamespaceMetadata`. Every pod template in both apps passes the profile when checked statically (non-root, no privilege escalation, all capabilities dropped, `RuntimeDefault` seccomp, no host namespaces or hostPath volumes). The labels are not `enforce` yet because cert-manager creates temporary ACME solver pods in these namespaces, and those were not tested. Warnings show in Argo CD's sync result. Switch to `enforce` once a certificate renewal has run without a warning.
+The `blog` and `sbom` namespaces carry `pod-security.kubernetes.io/enforce`, `warn` and `audit` labels set to `restricted`, applied by Argo CD through `managedNamespaceMetadata`. Every pod template in both apps passes the profile (non-root, no privilege escalation, all capabilities dropped, `RuntimeDefault` seccomp, no host namespaces or hostPath volumes). cert-manager creates temporary ACME solver pods in these namespaces; its v1.21 pod spec sets `runAsNonRoot`, `RuntimeDefault` seccomp, no privilege escalation, dropped capabilities and a read-only root filesystem, so renewals are not blocked. If a cert-manager upgrade ever changes that, a renewal would fail with a `forbidden: violates PodSecurity` event on the Order, so check there first.
 
 ## Left to do
 

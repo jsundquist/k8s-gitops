@@ -9,7 +9,7 @@ push to main (or daily cron)
   -> build job: pnpm build, upload dist/ as an artifact
   -> deploy job: GitHub Pages
   -> image job: Dockerfile packages dist/ into nginx-unprivileged, pushed to GHCR
-  -> bump job: rewrites images[0].newTag in apps/blog/kustomization.yaml in this repo
+  -> bump job: rewrites the image's newTag and digest in apps/blog/kustomization.yaml in this repo
   -> Argo CD syncs apps/blog -> rolling update on the droplet
 ```
 
