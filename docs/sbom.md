@@ -4,7 +4,7 @@ The Next.js SBOM dashboard runs at `sbom.digital-portfolio.net`. Its source, Doc
 
 ## Workloads
 
-One image (`ghcr.io/jsundquist/sbom`) runs three ways, all in the `sbom` namespace:
+Two images built from the same commit and tagged identically run in the `sbom` namespace: `ghcr.io/jsundquist/sbom` (web only, Next.js standalone) and `ghcr.io/jsundquist/sbom-worker` (worker and migrate; has `tsx`, `src/`, `scripts/` and `drizzle/`):
 
 | Name | Kind | Sync wave | Notes |
 |---|---|---|---|
@@ -16,11 +16,12 @@ One image (`ghcr.io/jsundquist/sbom`) runs three ways, all in the `sbom` namespa
 ## Decisions
 
 - **Migrate is a Sync hook, not PreSync.** A PreSync hook runs before anything else in the sync, including Postgres and the secrets, so on the first sync it would have nothing to connect to. As a Sync-phase hook in wave 1 it runs after the database is ready and before web and worker roll out.
-- **Node directly, not npm.** `npm` runs a shell that swallows SIGTERM, so graceful shutdown never ran. Web uses the image default and the worker sets `command`.
-- **Single replica for web.** The rate limiter is in memory per pod. Web is cut off on rollout because `next start` does not drain; accepted.
+- **Node directly, not npm.** `npm` runs a shell that swallows SIGTERM, so graceful shutdown never ran. Web uses the image default (`node server.js`); the worker sets `command` explicitly and migrate runs `scripts/migrate.ts`.
+- **Single replica for web.** The rate limiter is in memory per pod. Web is cut off on rollout because Next.js does not drain; accepted.
 - **Worker uses `Recreate`.** Two workers must not enrich at once, even briefly.
 - **Postgres in-cluster, no backups yet.** The data is rebuildable from re-uploads, but a backup job is a stage 9 item.
-- **Public image.** Same reasoning as the blog: no pull secret. Make the GHCR package public by hand after the first push.
+- **Public images.** Same reasoning as the blog: no pull secret. Make both GHCR packages (`sbom` and `sbom-worker`) public by hand after the first push.
+- **Two images, one tag.** Web needs no `tsx` or sources, so it ships separately. Migrate and worker must run from the `sbom-worker` image, which is why `kustomization.yaml` lists both. The release `bump` job sets both tags with `yq` (`images[0]` is web, the other is matched by name), so keep that order and never pin them by hand.
 - **Hardening.** Non-root, read-only root filesystem, no capabilities, `RuntimeDefault` seccomp, and `emptyDir`s for the few writable paths. This mirrors the compose file.
 - **Staging issuer first** on the Ingress, then `letsencrypt-prod`, like the blog.
 
@@ -78,7 +79,7 @@ kubectl create secret generic sbom-app -n sbom --dry-run=client -o yaml \
 
 ## Deploys
 
-The sbom repository's `release.yml` builds, scans (Trivy) and pushes the image on every push to `main`. Its `bump` job then pins the new tag in `apps/sbom/kustomization.yaml` here (commit `chore(sbom): deploy <tag>`), and Argo CD syncs: the migrate Job runs first, then web and worker roll out. A separate `token-expiry` job warns 14 days before the token expires.
+The sbom repository's `release.yml` builds, scans (Trivy) and pushes both images on every push to `main`. Its `bump` job then pins the new tag on both in `apps/sbom/kustomization.yaml` here (commit `chore(sbom): deploy <tag>`), and Argo CD syncs: the migrate Job runs first, then web and worker roll out. A separate `token-expiry` job warns 14 days before the token expires.
 
 - **Token:** a fine-grained PAT, repository `jsundquist/k8s-gitops` only, `Contents: Read and write`, stored as the `GITOPS_TOKEN` secret in the sbom repository. It is separate from the blog's token so either can be revoked on its own.
 - **Poll delay.** Argo CD polls git every few minutes and has no webhook (the API is not exposed), so a deploy can take several minutes to start. Hard-refresh the Application to start it sooner.

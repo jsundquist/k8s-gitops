@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: migrate
-        image: ghcr.io/jsundquist/sbom
+        image: ghcr.io/jsundquist/sbom-worker
         command: ["node", "--import", "tsx", "scripts/migrate.ts"]
         env:
         # The only variable migrate needs.
