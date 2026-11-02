@@ -24,4 +24,4 @@ patches:
 # The sbom repo's release workflow publishes the image; the tag is bumped here.
 images:
   - name: ghcr.io/jsundquist/sbom
-    newTag: 38774ae-3
+    newTag: c79019e-4
