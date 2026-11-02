@@ -12,6 +12,7 @@ resources:
   - worker.yaml
   - ingress.yaml
   - networkpolicies.yaml
+  - limitrange.yaml
 # Create the sealed secrets before everything that reads them.
 patches:
   - target:
