@@ -15,7 +15,7 @@ spec:
         app: whoami
     spec:
       containers:
-      - image: traefik/whoami:v1.10.3@sha256:43a68d10b9dfcfc3ffbfe4dd42100dc9aeaf29b3a5636c856337a5940f1b4f1c
+      - image: traefik/whoami:v1.12.0@sha256:c4717a8d1f0134a7444e24f881160e033991f23027c6c5a9a3f8fd22e70d1d44
         name: whoami
         ports:
         - containerPort: 80
