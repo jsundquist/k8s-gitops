@@ -92,7 +92,7 @@ The sbom repository's `release.yml` builds, scans (Trivy) and pushes both images
 
 ## Updating Postgres
 
-The database and backup images are pinned by digest (`postgres:16@sha256:...`), so nothing changes underneath you, and they always match each other. A digest freezes OS packages too, so bump it deliberately, for example monthly or when the dashboard's `k8s-gitops/postgres` entry shows new fixable vulnerabilities:
+The database and backup images are pinned by digest (`postgres:16@sha256:...`), so nothing changes underneath you, and they always match each other. The `rclone` image in `backup.yaml` is pinned the same way (`rclone/rclone:1.75.2@sha256:...`, the multi-arch index digest), and CI fails any new image that is not pinned. A digest freezes OS packages too, so bump it deliberately, for example monthly or when the dashboard's `k8s-gitops/postgres` entry shows new fixable vulnerabilities:
 
 1. Find the new digest of the multi-arch index: `docker buildx imagetools inspect postgres:16` (the top-level `Digest`), or the Docker Hub tags API.
 2. Replace it in both `postgres.yaml` and `backup.yaml`. Stay on major version 16 here: a major upgrade needs a dump and restore.

@@ -13,7 +13,8 @@ Stage 9 notes: what has been done, why, and what is left.
 | Pre-commit gitleaks, with a narrow allowlist for Sealed Secrets ciphertext | `lefthook.yml`, `.gitleaks.toml` |
 | CI: gitleaks history scan, manifest validation, actionlint, zizmor; Dependabot with a 7-day cooldown | `.github/workflows/ci.yml`, `.github/dependabot.yml` |
 | Weekly SBOM upload for every deployed image, watched by the SBOM dashboard | `.github/workflows/cluster-sbom.yml` |
-| Postgres pinned by digest | `apps/sbom/postgres.yaml`, `apps/sbom/backup.yaml` |
+| Postgres and rclone pinned by digest; CI fails any other unpinned image except the three the release workflows re-pin | `apps/sbom/postgres.yaml`, `apps/sbom/backup.yaml`, `.github/workflows/ci.yml` |
+| `SECURITY.md`, private vulnerability reporting, actions required to be SHA-pinned | `SECURITY.md`, repository settings |
 
 ## Client IPs
 
