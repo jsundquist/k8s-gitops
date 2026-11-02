@@ -97,6 +97,27 @@ jobs:
           done < <(find argocd -name '*.yaml')
           exit "$fail"
 
+      # Digests make an image immutable. The three images below are the exception: their release workflows
+      # re-pin them with a tag on every deploy. Drop an entry once its release workflow pins by digest.
+      - name: Require image digests
+        run: |
+          set -euo pipefail
+          allow='^ghcr\.io/jsundquist/(sbom|sbom-worker|jsundquist\.github\.io):'
+          fail=0
+          while IFS= read -r image; do
+            case "$image" in *@sha256:*) continue ;; esac
+            if [[ "$image" =~ $allow ]]; then
+              continue
+            fi
+            echo "::error::${image} is not pinned by digest (name:tag@sha256:...)"
+            fail=1
+          done < <(
+            for dir in apps/blog apps/sbom; do
+              kubectl kustomize "$dir" | yq eval-all --no-doc '.. | select(tag == "!!map" and has("image")) | .image' -
+            done | sort -u
+          )
+          exit "$fail"
+
   # Static analysis of the workflows themselves, same actions and pins as the sbom repository.
   actionlint:
     runs-on: ubuntu-latest
