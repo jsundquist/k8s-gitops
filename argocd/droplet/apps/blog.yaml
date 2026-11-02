@@ -19,9 +19,10 @@ spec:
       selfHeal: true
     syncOptions:
     - CreateNamespace=true
-    # Pod Security Admission, warn and audit only for now: cert-manager creates temporary solver pods here
-    # that are not tested against "restricted". Switch to enforce once a renewal has run clean.
+    # Pod Security Admission: pods that do not meet the "restricted" profile are rejected. cert-manager's
+    # ACME solver pods in this namespace comply (checked against its v1.21 pod spec and a server-side dry run).
     managedNamespaceMetadata:
       labels:
+        pod-security.kubernetes.io/enforce: restricted
         pod-security.kubernetes.io/warn: restricted
         pod-security.kubernetes.io/audit: restricted

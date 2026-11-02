@@ -21,7 +21,7 @@ Two images built from the same commit and tagged identically run in the `sbom` n
 - **Worker uses `Recreate`.** Two workers must not enrich at once, even briefly.
 - **Postgres in-cluster, backed up nightly.** The data is rebuildable from re-uploads, but a CronJob still dumps it every night to an encrypted Spaces bucket; see [backups.md](backups.md).
 - **Public images.** Same reasoning as the blog: no pull secret. Make both GHCR packages (`sbom` and `sbom-worker`) public by hand after the first push.
-- **Two images, one tag.** Web needs no `tsx` or sources, so it ships separately. Migrate and worker must run from the `sbom-worker` image, which is why `kustomization.yaml` lists both. The release `bump` job sets both tags with `yq` (`images[0]` is web, the other is matched by name), so keep that order and never pin them by hand.
+- **Two images, one tag.** Web needs no `tsx` or sources, so it ships separately. Migrate and worker must run from the `sbom-worker` image, which is why `kustomization.yaml` lists both. The release `bump` job sets `newTag` and `digest` on each entry with `yq`, matching them by image name and reading the file back before it commits, so never pin them by hand. Kustomize renders `name:tag@sha256:...`, so the tag stays readable and the digest is what the node pulls.
 - **Hardening.** Non-root, read-only root filesystem, no capabilities, `RuntimeDefault` seccomp, and `emptyDir`s for the few writable paths. This mirrors the compose file.
 - **Staging issuer first** on the Ingress, then `letsencrypt-prod`, like the blog.
 
@@ -79,7 +79,7 @@ kubectl create secret generic sbom-app -n sbom --dry-run=client -o yaml \
 
 ## Deploys
 
-The sbom repository's `release.yml` builds, scans (Trivy) and pushes both images on every push to `main`. Its `bump` job then pins the new tag on both in `apps/sbom/kustomization.yaml` here (commit `chore(sbom): deploy <tag>`), and Argo CD syncs: the migrate Job runs first, then web and worker roll out. A separate `token-expiry` job warns 14 days before the token expires.
+The sbom repository's `release.yml` builds, scans (Trivy) and pushes both images on every push to `main`. Its `bump` job then pins the new tag and the signed image digest on both in `apps/sbom/kustomization.yaml` here (commit `chore(sbom): deploy <tag>`), and Argo CD syncs: the migrate Job runs first, then web and worker roll out. A separate `token-expiry` job warns 14 days before the token expires.
 
 - **Token:** a fine-grained PAT, repository `jsundquist/k8s-gitops` only, `Contents: Read and write`, stored as the `GITOPS_TOKEN` secret in the sbom repository. It is separate from the blog's token so either can be revoked on its own.
 - **Poll delay.** Argo CD polls git every few minutes and has no webhook (the API is not exposed), so a deploy can take several minutes to start. Hard-refresh the Application to start it sooner.
@@ -92,7 +92,7 @@ The sbom repository's `release.yml` builds, scans (Trivy) and pushes both images
 
 ## Updating Postgres
 
-The database and backup images are pinned by digest (`postgres:16@sha256:...`), so nothing changes underneath you, and they always match each other. The `rclone` image in `backup.yaml` is pinned the same way (`rclone/rclone:1.75.2@sha256:...`, the multi-arch index digest), and CI fails any new image that is not pinned. A digest freezes OS packages too, so bump it deliberately, for example monthly or when the dashboard's `k8s-gitops/postgres` entry shows new fixable vulnerabilities:
+The database and backup images are pinned by digest (`postgres:16@sha256:...`), so nothing changes underneath you, and they always match each other. The `rclone` image in `backup.yaml` is pinned the same way (`rclone/rclone:1.75.2@sha256:...`, the multi-arch index digest), and CI fails any rendered image that is not pinned, including the ones the release workflows manage. A digest freezes OS packages too, so bump it deliberately, for example monthly or when the dashboard's `k8s-gitops/postgres` entry shows new fixable vulnerabilities:
 
 1. Find the new digest of the multi-arch index: `docker buildx imagetools inspect postgres:16` (the top-level `Digest`), or the Docker Hub tags API.
 2. Replace it in both `postgres.yaml` and `backup.yaml`. Stay on major version 16 here: a major upgrade needs a dump and restore.
