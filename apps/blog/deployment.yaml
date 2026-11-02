@@ -14,6 +14,14 @@ spec:
       labels:
         app: blog
     spec:
+      enableServiceLinks: false
+      # nginx-unprivileged runs as uid/gid 101; stating it lets Kubernetes verify runAsNonRoot.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       # The tag comes from kustomization.yaml, which the blog repo's deploy workflow updates.
       - image: ghcr.io/jsundquist/jsundquist.github.io
@@ -40,3 +48,16 @@ spec:
           limits:
             cpu: 100m
             memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        # nginx writes its pid and temp directories under /tmp; everything else is read-only.
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 16Mi
