@@ -1,0 +1,67 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "timezone": "America/Los_Angeles",
+  "minimumReleaseAge": "7 days",
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps",
+  "enabledManagers": [
+    "kubernetes",
+    "kustomize",
+    "argocd"
+  ],
+  "kubernetes": {
+    "managerFilePatterns": [
+      "/^apps/.+\\.ya?ml$/"
+    ]
+  },
+  "argocd": {
+    "managerFilePatterns": [
+      "/^argocd/.+\\.ya?ml$/"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "The sbom and blog release workflows write tag and digest for these images. Renovate must not touch them.",
+      "matchPackageNames": [
+        "ghcr.io/jsundquist/sbom",
+        "ghcr.io/jsundquist/sbom-worker",
+        "ghcr.io/jsundquist/jsundquist.github.io"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Argo CD Applications that point at this repository follow main on purpose.",
+      "matchDatasources": [
+        "git-refs",
+        "git-tags",
+        "github-tags"
+      ],
+      "matchPackageNames": [
+        "https://github.com/jsundquist/k8s-gitops"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "postgres.yaml and backup.yaml must run the same Postgres build (pg_dump matches the server), so they move together. Stay on major 16 until a deliberate upgrade.",
+      "matchPackageNames": [
+        "postgres"
+      ],
+      "groupName": "postgres",
+      "allowedVersions": "/^16(\\.\\d+)*$/"
+    },
+    {
+      "description": "Always pin digests, like the rest of the repository.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "pinDigests": true
+    }
+  ]
+}
