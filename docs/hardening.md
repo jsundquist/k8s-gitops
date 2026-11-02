@@ -51,6 +51,5 @@ Not covered yet: `argocd` (the upstream install ships its own ingress policies),
 
 ## Left to do
 
-- Supply chain gaps (signing, provenance, digest pins, admission policy) per repo: [supply-chain-checklist.md](supply-chain-checklist.md).
 - Swap file and resource headroom (4 GB, no swap).
 - Observability: metrics, logs and alerting (including failed backups).
