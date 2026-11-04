@@ -26,8 +26,8 @@ patches:
 # Keep the web entry first and do not hand-edit the tags: the bump job addresses them by position and name.
 images:
   - name: ghcr.io/jsundquist/sbom
-    newTag: 05864bc-14
-    digest: sha256:441e3f4066800dfc6e854317ed2567e222d4199fdda2cbf47ffdd46048fa663b
+    newTag: cf16691-15
+    digest: sha256:7facf50eb4ce8ebd4598034bfc69ddadd48cd4156140d9ab521fc2abf5f290b8
   - name: ghcr.io/jsundquist/sbom-worker
-    newTag: 05864bc-14
-    digest: sha256:f73813e06557efa8d7780ce09ef9ff377980fccd368459c17f8927c03f62d65a
+    newTag: cf16691-15
+    digest: sha256:b197c643a309469aad3d4c0368371764f6355bf1275c167451c95b8c944499ea
